@@ -1,6 +1,8 @@
 
 # SecureStorage plugin for Apache Cordova
 
+:warning: This plugin is SUPPORTED by OutSystems. Customers entitled to Support Services may obtain assistance through Support.
+
 [![NPM](https://nodei.co/npm/cordova-plugin-secure-storage.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/cordova-plugin-secure-storage/)
 
 ## Introduction
