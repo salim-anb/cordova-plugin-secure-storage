@@ -16,6 +16,17 @@ var _checkCallbacks = function (success, error) {
     }
 };
 
+//Taken from undescore.js
+var _isString = function isString(x) {
+    return Object.prototype.toString.call(x) === '[object String]';
+};
+
+var _checkIsString = function(value){
+    if (!_isString(value)) {
+        throw new Error('Value is not a String');
+    }
+};
+
 var _merge_options = function (defaults, options){
     var res = {};
     var attrname;
@@ -56,7 +67,7 @@ var _executeNativeMethod = function (success, error, nativeMethodName, args) {
             error(new Error('Error occured while executing native method.'));
         } else {
             // wrap string to Error instance if necessary
-            error(typeof err === 'string' ? new Error(err) : err);
+            error(_isString(err) ? new Error(err) : err);
         }
     };
 
@@ -80,6 +91,7 @@ SecureStorageiOS.prototype = {
 
     set: function (success, error, key, value) {
         try {
+            _checkIsString(value);
             _executeNativeMethod(success, error, 'set', [this.service, key, value]);
         } catch (e) {
             error(e);
@@ -92,6 +104,22 @@ SecureStorageiOS.prototype = {
         } catch (e) {
             error(e);
         }
+    },
+
+    keys: function (success, error) {
+        try {
+            _executeNativeMethod(success, error, 'keys', [this.service]);
+        } catch (e) {
+            error(e);
+        }
+    },
+
+    clear: function (success, error) {
+        try {
+            _executeNativeMethod(success, error, 'clear', [this.service]);
+        } catch (e) {
+            error(e);
+        }
     }
 };
 
@@ -101,7 +129,6 @@ SecureStorageWindows = SecureStorageiOS;
 
 SecureStorageAndroid = function (success, error, service, options) {
     var self = this;
-
     if (options) {
         this.options = _merge_options(this.options, options);
     }
@@ -162,48 +189,90 @@ SecureStorageAndroid.prototype = {
     },
 
     get: function (success, error, key) {
-        if (this.options.native) {
-            this._native_get(success, error, key);
-        } else {
-            this._sjcl_get(success, error, key);
+        try {
+            if (this.options.native) {
+                this._native_get(success, error, key);
+            } else {
+                this._sjcl_get(success, error, key);
+            }
+        } catch (e) {
+            error(e);
         }
     },
 
     set: function (success, error, key, value) {
-        if (this.options.native) {
-            this._native_set(success, error, key, value);
-        } else {
-            this._sjcl_set(success, error, key, value);
+        try {
+            _checkIsString(value);
+            if (this.options.native) {
+                this._native_set(success, error, key, value);
+            } else {
+                this._sjcl_set(success, error, key, value);
+            }
+        } catch (e) {
+            error(e);
+        }
+    },
+
+    keys: function (success, error) {
+        try {
+            _executeNativeMethod(
+                function (ret) {
+                    var i, len = ret.length, keys = [];
+                    for (i = 0; i < len; ++i) {
+                        if (ret[i] && ret[i].slice(0, 4) === '_SS_') {
+                            keys.push(ret[i].slice(4));
+                        }
+                    }
+                    success(keys);
+                },
+                error,
+                'keys',
+                []
+            );
+        } catch (e) {
+            error(e);
         }
     },
 
     remove: function (success, error, key) {
-        _executeNativeMethod(
-            function () {
-                success(key);
-            },
-            error,
-            'remove',
-            ['_SS_' + key]
-        );
+        try {
+            _executeNativeMethod(
+                function () {
+                    success(key);
+                },
+                error,
+                'remove',
+                ['_SS_' + key]
+            );
+        } catch (e) {
+            error(e);
+        }
     },
 
     secureDevice: function (success, error) {
-        _executeNativeMethod(
-            success,
-            error,
-            'secureDevice',
-            []
-        );
+        try {
+            _executeNativeMethod(
+                success,
+                error,
+                'secureDevice',
+                []
+            );
+        } catch (e) {
+            error(e);
+        }
     },
 
     clear: function (success, error) {
-        _executeNativeMethod(
-            success,
-            error,
-            'clear',
-            []
-        );
+        try {
+            _executeNativeMethod(
+                success,
+                error,
+                'clear',
+                []
+            );
+        } catch (e) {
+            error(e);
+        }
     },
 
     _fetch: function (success, error, key) {
@@ -219,62 +288,53 @@ SecureStorageAndroid.prototype = {
 
     _sjcl_get: function (success, error, key) {
         var payload;
-        try {
-            _executeNativeMethod(
-                function (value) {
-                    payload = JSON.parse(value);
-                    _executeNativeMethod(
-                        function (AESKey) {
-                            var value, AESKeyBits;
-                            try {
-                                AESKeyBits = sjcl_ss.codec.base64.toBits(AESKey);
-                                value = sjcl_ss.decrypt(AESKeyBits, payload.value);
-                                success(value);
-                            } catch (e) {
-                                error(e);
-                            }
-                        },
-                        error,
-                        'decrypt_rsa',
-                        [payload.key]
-                    );
-                },
-                error,
-                'fetch',
-                ['_SS_' + key]
-            );
-
-        } catch (e) {
-            error(e);
-        }
+        _executeNativeMethod(
+            function (value) {
+                payload = JSON.parse(value);
+                _executeNativeMethod(
+                    function (AESKey) {
+                        var value, AESKeyBits;
+                        try {
+                            AESKeyBits = sjcl_ss.codec.base64.toBits(AESKey);
+                            value = sjcl_ss.decrypt(AESKeyBits, payload.value);
+                            success(value);
+                        } catch (e) {
+                            error(e);
+                        }
+                    },
+                    error,
+                    'decrypt_rsa',
+                    [payload.key]
+                );
+            },
+            error,
+            'fetch',
+            ['_SS_' + key]
+        );
     },
 
     _sjcl_set: function (success, error, key, value) {
         var AESKey, encValue;
 
-        try {
-            AESKey = sjcl_ss.random.randomWords(8);
-            _AES_PARAM.adata = this.service;
-            encValue = sjcl_ss.encrypt(AESKey, value, _AES_PARAM);
-            // Encrypt the AES key
-            _executeNativeMethod(
-                function (encKey) {
-                    _executeNativeMethod(
-                        function () {
-                            success(key);
-                        },
-                        error,
-                        'store',
-                        ['_SS_' + key, JSON.stringify({key: encKey, value: encValue})]
-                    );
-                },
-                error,
-                'encrypt_rsa',
-                [sjcl_ss.codec.base64.fromBits(AESKey)]
-            );
-        } catch (e) {
-            error(e);
-        }
+        AESKey = sjcl_ss.random.randomWords(8);
+        _AES_PARAM.adata = this.service;
+        encValue = sjcl_ss.encrypt(AESKey, value, _AES_PARAM);
+        // Encrypt the AES key
+        _executeNativeMethod(
+            function (encKey) {
+                _executeNativeMethod(
+                    function () {
+                        success(key);
+                    },
+                    error,
+                    'store',
+                    ['_SS_' + key, JSON.stringify({key: encKey, value: encValue})]
+                );
+            },
+            error,
+            'encrypt_rsa',
+            [sjcl_ss.codec.base64.fromBits(AESKey)]
+        );
     },
 
     _native_get: function (success, error, key) {
@@ -348,16 +408,19 @@ SecureStorageAndroid.prototype = {
             migrated();
         }
         for (key in secureStorageData) {
-            migrateEntry(key, secureStorageData[key]);
+            if (secureStorageData.hasOwnProperty(key)) {
+                migrateEntry(key, secureStorageData[key]);
+            }
         }
     },
 
     _migrate_to_native_aes: function (success) {
         var self = this;
-        var keysCnt, keysProcessed, key;
+        var keysCnt, keysProcessed;
         var keyProcessed;
         var migrated;
         var migrateKey;
+        var i;
 
         migrated = function () {
             _executeNativeMethod(
@@ -416,8 +479,8 @@ SecureStorageAndroid.prototype = {
                 if (keysCnt === 0) {
                     migrated();
                 } else {
-                    for (key in keys) {
-                        migrateKey(keys[key]);
+                    for (i = 0; i < keysCnt; i++) {
+                        migrateKey(keys[i]);
                     }
                 }
             },
@@ -454,6 +517,7 @@ SecureStorageBrowser.prototype = {
 
     set: function (success, error, key, value) {
         try {
+            _checkIsString(value);
             _checkCallbacks(success, error);
             localStorage.setItem('_SS_' + key, value);
             success(key);
@@ -461,9 +525,43 @@ SecureStorageBrowser.prototype = {
             error(e);
         }
     },
+
     remove: function (success, error, key) {
         localStorage.removeItem('_SS_' + key);
         success(key);
+    },
+
+    keys: function (success, error) {
+        var i, len, key, keys = [];
+        try {
+            _checkCallbacks(success, error);
+            for (i = 0, len = localStorage.length; i < len; ++i) {
+                key = localStorage.key(i);
+                if ('_SS_' === key.slice(0, 4)) {
+                    keys.push(key.slice(4));
+                }
+            }
+            success(keys);
+        } catch (e) {
+            error(e);
+        }
+    },
+
+    clear: function (success, error) {
+        var i, key;
+        try {
+            _checkCallbacks(success, error);
+            i = localStorage.length;
+            while (i-- > 0) {
+                key = localStorage.key(i);
+                if (key && '_SS_' === key.slice(0, 4)) {
+                    localStorage.removeItem(key);
+                }
+            }
+            success();
+        } catch (e) {
+            error(e);
+        }
     }
 };
 

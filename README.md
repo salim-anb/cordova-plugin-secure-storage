@@ -45,7 +45,7 @@ cordova plugin add https://github.com/crypho/cordova-plugin-secure-storage.git
 
 ##<a name="plugin_api"></a> Plugin API
 
-####Create a namespaced storage.
+#### Create a namespaced storage.
 
 ```js
 var ss = new cordova.plugins.SecureStorage(
@@ -83,7 +83,23 @@ ss.remove(
     'mykey');
 ```
 
-##Platform details
+#### Get all keys from the storage.
+
+```js
+ss.keys(
+    function (keys) { console.log('Got keys ' + keys.join(', ')); },
+    function (error) { console.log('Error, ' + error); });
+```
+
+#### Clear all keys from the storage.
+
+```js
+ss.clear(
+    function () { console.log('Cleared'); },
+    function (error) { console.log('Error, ' + error); });
+```
+
+## Platform details
 
 #### iOS
 On iOS secrets are stored directly in the KeyChain through the [SAMKeychain](https://github.com/soffes/samkeychain) library.
