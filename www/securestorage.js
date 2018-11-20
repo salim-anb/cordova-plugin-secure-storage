@@ -76,7 +76,16 @@ var _executeNativeMethod = function (success, error, nativeMethodName, args) {
 
 SecureStorageiOS = function (success, error, service) {
     this.service = service;
-    setTimeout(success, 0);
+    try {
+        _executeNativeMethod(
+            success,
+            error,
+            'init',
+            [this.service]
+        );
+    } catch (e) {
+        error(e);
+    }
     return this;
 };
 
@@ -125,7 +134,12 @@ SecureStorageiOS.prototype = {
 
 // SecureStorage for Windows web interface and proxy parameters are the same as on iOS
 // so we don't create own definition for Windows and simply re-use iOS
-SecureStorageWindows = SecureStorageiOS;
+SecureStorageWindows = function (success, error, service) {
+    this.service = service;
+    setTimeout(success, 0);
+    return this;
+};
+SecureStorageWindows.prototype = SecureStorageiOS.prototype;
 
 SecureStorageAndroid = function (success, error, service, options) {
     var self = this;
@@ -158,7 +172,7 @@ SecureStorageAndroid = function (success, error, service, options) {
                 };
 
                 if (self.options.migrateLocalStorage){
-                    self._migrate_to_native_storage(checkMigrateToNativeAES);
+                    self._migrate_to_native_storage(success);
                 } else {
                     _executeNativeMethod(
                         function () {
@@ -227,7 +241,7 @@ SecureStorageAndroid.prototype = {
                 },
                 error,
                 'keys',
-                []
+                [this.service]
             );
         } catch (e) {
             error(e);
@@ -242,7 +256,7 @@ SecureStorageAndroid.prototype = {
                 },
                 error,
                 'remove',
-                ['_SS_' + key]
+                [this.service, '_SS_' + key]
             );
         } catch (e) {
             error(e);
@@ -268,7 +282,7 @@ SecureStorageAndroid.prototype = {
                 success,
                 error,
                 'clear',
-                []
+                [this.service]
             );
         } catch (e) {
             error(e);
@@ -282,12 +296,13 @@ SecureStorageAndroid.prototype = {
             },
             error,
             'fetch',
-            ['_SS_' + key]
+            [this.service, '_SS_' + key]
         );
     },
 
     _sjcl_get: function (success, error, key) {
         var payload;
+        var self = this;
         _executeNativeMethod(
             function (value) {
                 payload = JSON.parse(value);
@@ -304,17 +319,18 @@ SecureStorageAndroid.prototype = {
                     },
                     error,
                     'decrypt_rsa',
-                    [payload.key]
+                    [self.service, payload.key]
                 );
             },
             error,
             'fetch',
-            ['_SS_' + key]
+            [this.service, '_SS_' + key]
         );
     },
 
     _sjcl_set: function (success, error, key, value) {
         var AESKey, encValue;
+        var self = this;
 
         AESKey = sjcl_ss.random.randomWords(8);
         _AES_PARAM.adata = this.service;
@@ -328,12 +344,12 @@ SecureStorageAndroid.prototype = {
                     },
                     error,
                     'store',
-                    ['_SS_' + key, JSON.stringify({key: encKey, value: encValue})]
+                    [self.service, '_SS_' + key, JSON.stringify({key: encKey, value: encValue})]
                 );
             },
             error,
             'encrypt_rsa',
-            [sjcl_ss.codec.base64.fromBits(AESKey)]
+            [this.service, sjcl_ss.codec.base64.fromBits(AESKey)]
         );
     },
 
@@ -342,7 +358,7 @@ SecureStorageAndroid.prototype = {
             success,
             error,
             'get',
-            ['_SS_' + key]
+            [this.service, '_SS_' + key]
         );
     },
 
@@ -353,18 +369,19 @@ SecureStorageAndroid.prototype = {
             },
             error,
             'set',
-            ['_SS_' + key, value, this.service]
+            [this.service, '_SS_' + key, value]
         );
     },
 
     _migrate_to_native_storage: function (success) {
         var key;
         var secureStorageData = [];
-        var entriesCnt;
+        var entriesCnt = 0;
         var entriesProcessed = 0;
         var entryMigrated;
         var migrated;
         var migrateEntry;
+        var self = this;
 
         migrated = function () {
             _executeNativeMethod(
@@ -374,7 +391,7 @@ SecureStorageAndroid.prototype = {
                 function () {
                 },
                 'store',
-                ['_SS_MIGRATED_TO_NATIVE_STORAGE', '1']
+                [self.service, '_SS_MIGRATED_TO_NATIVE_STORAGE', '1']
             );
         };
 
@@ -394,22 +411,23 @@ SecureStorageAndroid.prototype = {
                 function () {
                 },
                 'store',
-                [key, value]
+                [self.service, key, value]
             );
         };
 
         for (key in localStorage) {
             if (localStorage.hasOwnProperty(key) && key.indexOf('_SS_') === 0) {
+                entriesCnt++;
                 secureStorageData[key] = localStorage.getItem(key);
             }
         }
-        entriesCnt = secureStorageData.length;
         if (entriesCnt === 0) {
             migrated();
-        }
-        for (key in secureStorageData) {
-            if (secureStorageData.hasOwnProperty(key)) {
-                migrateEntry(key, secureStorageData[key]);
+        } else {
+            for (key in secureStorageData) {
+                if (secureStorageData.hasOwnProperty(key)) {
+                    migrateEntry(key, secureStorageData[key]);
+                }
             }
         }
     },
@@ -421,6 +439,7 @@ SecureStorageAndroid.prototype = {
         var migrated;
         var migrateKey;
         var i;
+        var self = this;
 
         migrated = function () {
             _executeNativeMethod(
@@ -430,7 +449,7 @@ SecureStorageAndroid.prototype = {
                 function () {
                 },
                 'store',
-                ['_SS_MIGRATED_TO_NATIVE', '1']
+                [self.service, '_SS_MIGRATED_TO_NATIVE', '1']
             );
         };
 
@@ -468,7 +487,7 @@ SecureStorageAndroid.prototype = {
                 function () {
                 },
                 'fetch',
-                [key]
+                [self.service, key]
             );
         };
 
@@ -487,7 +506,7 @@ SecureStorageAndroid.prototype = {
             function () {
             },
             'keys',
-            []
+            [self.service]
         );
     }
 };
