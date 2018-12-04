@@ -1,20 +1,54 @@
 var SERVICE = 'testing';
+var SERVICE_2 = 'testing_2';
 
 exports.defineAutoTests = function() {
-    var ss, handlers;
+    var ss, ss_2, handlers;
+
+    if(cordova.platformId === 'android' && parseFloat(device.version) <= 4.3){
+        describe('cordova-plugin-secure-storage-android-unsupported', function () {
+            beforeEach(function () {
+                handlers = {
+                    successHandler: function () {},
+                    errorHandler: function () {}
+                };
+            });
+
+            it('should call the error handler when attempting to use the plugin on Android 4.3 or below', function (done) {
+                spyOn(handlers, 'errorHandler').and.callFake(function (res) {
+                    expect(res).toEqual(jasmine.any(Error));
+                    expect(handlers.successHandler).not.toHaveBeenCalled();
+                    done();
+                });
+                spyOn(handlers, 'successHandler');
+
+                ss = new cordova.plugins.SecureStorage(function () {
+                    ss.set(function () {
+                        ss.get(handlers.successHandler, handlers.errorHandler, 'foo');
+                    }, function () {}, 'foo', 'foo');
+                }, handlers.errorHandler, SERVICE);
+            });
+        });
+        return; // skip all other tests
+    }
 
     describe('cordova-plugin-secure-storage', function () {
 
         beforeEach(function () {
             handlers = {
                 successHandler: function () {},
-                errorHandler: function () {}
+                errorHandler: function () {},
+                successHandler_2: function () {},
+                errorHandler_2: function () {}
             };
         });
 
         afterEach(function (done) {
             ss = new cordova.plugins.SecureStorage(function () {
-                ss.clear(done, handlers.errorHandler);
+                ss.clear(function () {
+                    ss_2 = new cordova.plugins.SecureStorage(function () {
+                        ss_2.clear(done, handlers.errorHandler_2);
+                    }, handlers.errorHandler_2, SERVICE_2);
+                }, handlers.errorHandler);
             }, handlers.errorHandler, SERVICE);
         });
 
@@ -80,7 +114,8 @@ exports.defineAutoTests = function() {
         });
 
         it('should call the error handler when getting a key that does not exist', function (done) {
-            spyOn(handlers, 'errorHandler').and.callFake(function () {
+            spyOn(handlers, 'errorHandler').and.callFake(function (res) {
+                expect(res).toEqual(jasmine.any(Error));
                 expect(handlers.successHandler).not.toHaveBeenCalled();
                 done();
             });
@@ -92,7 +127,8 @@ exports.defineAutoTests = function() {
         });
 
         it('should call the error handler when getting a key that existed but got deleted', function (done) {
-            spyOn(handlers, 'errorHandler').and.callFake(function () {
+            spyOn(handlers, 'errorHandler').and.callFake(function (res) {
+                expect(res).toEqual(jasmine.any(Error));
                 expect(handlers.successHandler).not.toHaveBeenCalled();
                 done();
             });
@@ -110,7 +146,8 @@ exports.defineAutoTests = function() {
         });
 
         it('should call the error handler when setting a value that is not a string', function (done) {
-            spyOn(handlers, 'errorHandler').and.callFake(function () {
+            spyOn(handlers, 'errorHandler').and.callFake(function (res) {
+                expect(res).toEqual(jasmine.any(Error));
                 expect(handlers.successHandler).not.toHaveBeenCalled();
                 done();
             });
@@ -277,6 +314,63 @@ exports.defineAutoTests = function() {
                 encrypt();
             }, handlers.errorHandler, SERVICE);
 
+        });
+
+        it('should not be able to get a key/value that was set from a another instance of SecureStorage', function (done) {
+            ss = new cordova.plugins.SecureStorage(function () {
+                ss.set(function () {
+                    ss_2 = new cordova.plugins.SecureStorage(function () {
+                        spyOn(handlers, 'errorHandler').and.callFake(function (res) {
+                            expect(handlers.successHandler).not.toHaveBeenCalled();
+                            done();
+                        });
+                        spyOn(handlers, 'successHandler');
+                        ss_2.get(handlers.successHandler, handlers.errorHandler, 'foo');
+                    },
+                    handlers.errorHandler,
+                    SERVICE_2);
+                },
+                handlers.errorHandler,
+                'foo',
+                'bar');
+            },
+            handlers.errorHandler,
+            SERVICE);
+        });
+
+        it('different instances should be able to get different values for the same key', function (done) {
+            ss = new cordova.plugins.SecureStorage(function () {
+                ss.set(function () {
+                    ss_2 = new cordova.plugins.SecureStorage(function () {
+                        ss_2.set(function () {
+                            spyOn(handlers, 'successHandler').and.callFake(function (res) {
+                                expect(res).toEqual('bar');
+                                expect(handlers.errorHandler).not.toHaveBeenCalled();
+
+                                spyOn(handlers, 'successHandler_2').and.callFake(function (res) {
+                                    expect(res).toEqual('bar_2');
+                                    expect(handlers.errorHandler_2).not.toHaveBeenCalled();
+                                    done();
+                                });
+                                spyOn(handlers, 'errorHandler_2');
+                                ss_2.get(handlers.successHandler_2, handlers.errorHandler_2, 'foo');
+                            });
+                            spyOn(handlers, 'errorHandler');
+                            ss.get(handlers.successHandler, handlers.errorHandler, 'foo');
+                        },
+                        handlers.errorHandler_2,
+                        'foo',
+                        'bar_2');
+                    },
+                    handlers.errorHandler_2,
+                    SERVICE_2);
+                },
+                handlers.errorHandler,
+                'foo',
+                'bar');
+            },
+            handlers.errorHandler,
+            SERVICE);
         });
 
     });
