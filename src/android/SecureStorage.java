@@ -251,7 +251,14 @@ public class SecureStorage extends CordovaPlugin {
     private void unlockCredentials() {
         cordova.getActivity().runOnUiThread(new Runnable() {
             public void run() {
-                Intent intent = new Intent("com.android.credentials.UNLOCK");
+                // Made in context of RNMT-3255
+                Intent intent = null;
+                if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                    KeyguardManager keyguardManager = (KeyguardManager) (getContext().getSystemService(Context.KEYGUARD_SERVICE));
+                    intent = keyguardManager.createConfirmDeviceCredentialIntent(null, null);
+                } else {
+                    intent = new Intent("com.android.credentials.UNLOCK");
+                }
                 startActivity(intent);
             }
         });
