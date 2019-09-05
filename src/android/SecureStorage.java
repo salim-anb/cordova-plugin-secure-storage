@@ -253,7 +253,7 @@ public class SecureStorage extends CordovaPlugin {
             public void run() {
                 // Made in context of RNMT-3255
                 Intent intent = null;
-                if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                if(Build.VERSION.SDK_INT > 28) {
                     KeyguardManager keyguardManager = (KeyguardManager) (getContext().getSystemService(Context.KEYGUARD_SERVICE));
                     intent = keyguardManager.createConfirmDeviceCredentialIntent(null, null);
                 } else {
