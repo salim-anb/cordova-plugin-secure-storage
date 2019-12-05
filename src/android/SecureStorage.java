@@ -3,6 +3,7 @@ package com.crypho.plugins;
 import java.lang.reflect.Method;
 import java.util.Hashtable;
 
+import android.app.admin.DevicePolicyManager;
 import android.util.Log;
 import android.util.Base64;
 import android.os.Build;
@@ -16,7 +17,6 @@ import org.apache.cordova.CordovaPlugin;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONArray;
-import javax.crypto.Cipher;
 
 public class SecureStorage extends CordovaPlugin {
     private static final String TAG = "SecureStorage";
@@ -251,17 +251,31 @@ public class SecureStorage extends CordovaPlugin {
     private void unlockCredentials() {
         cordova.getActivity().runOnUiThread(new Runnable() {
             public void run() {
-                // Made in context of RNMT-3255
-                Intent intent = null;
-                if(Build.VERSION.SDK_INT > 28) {
-                    KeyguardManager keyguardManager = (KeyguardManager) (getContext().getSystemService(Context.KEYGUARD_SERVICE));
-                    intent = keyguardManager.createConfirmDeviceCredentialIntent(null, null);
+
+                if (Build.VERSION.SDK_INT > 28) {
+                    unlockCredentialsUsingKeyguardManager();
                 } else {
-                    intent = new Intent("com.android.credentials.UNLOCK");
+                    unlockCredentialsUsingUnlockIntent();
                 }
-                startActivity(intent);
             }
         });
+    }
+
+    // Made in context of RNMT-3255 and RNMT-3540
+    private void unlockCredentialsUsingKeyguardManager() {
+        KeyguardManager keyguardManager = (KeyguardManager) (getContext().getSystemService(Context.KEYGUARD_SERVICE));
+        Intent intent = keyguardManager.createConfirmDeviceCredentialIntent(null, null);
+
+        if (intent == null) {
+            intent = new Intent(DevicePolicyManager.ACTION_SET_NEW_PASSWORD);
+        }
+
+        startActivity(intent);
+    }
+
+    private void unlockCredentialsUsingUnlockIntent() {
+        Intent intent = new Intent("com.android.credentials.UNLOCK");
+        startActivity(intent);
     }
 
     private Context getContext() {
